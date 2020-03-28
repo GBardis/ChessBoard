@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Chessboard Game</string>
+    <string name="message_both_values_are_assigned">You have already assigned a starting position and a waypoint position</string>
+    <string name="reset">Reset</string>
+    <string name="calculate_paths">calculate paths</string>
+    <string name="start_game">Start Game</string>
+    <string name="add_number_of_moves_moves">Add number of moves</string>
+    <string name="board_size">Board Size</string>
+</resources>
