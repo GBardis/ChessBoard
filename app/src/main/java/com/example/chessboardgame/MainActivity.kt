@@ -1,17 +1,20 @@
 package com.example.chessboardgame
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.Button
 import android.widget.EditText
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
-
 class MainActivity : AppCompatActivity() {
+    lateinit var boardSize: EditText
+    lateinit var numberOfMoves: EditText
+    lateinit var startGameButton: Button
+    lateinit var continueGameButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -20,44 +23,58 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initView() {
-        // Initialize TextView and buttons
-        val boardSize = findViewById<EditText>(R.id.text_view_board_size)
-        val numberOfMoves = findViewById<EditText>(R.id.text_number_of_moves)
-        val startGameButton = findViewById<Button>(R.id.button_start_game)
+        boardSize = findViewById(R.id.text_view_board_size)
+        numberOfMoves = findViewById(R.id.text_number_of_moves)
+        startGameButton = findViewById(R.id.button_start_game)
+        continueGameButton = findViewById(R.id.button_continue_game)
 
-        initEditTextValidators(boardSize, numberOfMoves)
+
+
+        initEditTextValidators()
 
         startGameButton.setOnClickListener {
-            if (checkValidations(boardSize, numberOfMoves)) {
+            if (checkValidations()) {
                 val intent = Intent(this, ChessBoardActivity::class.java)
-                intent.putExtra("boardSize", boardSize.text.toString())
-                intent.putExtra("numberOfMoves", numberOfMoves.text.toString())
+                intent.putExtra("boardSize", boardSize.text.toString().toInt())
+                intent.putExtra("numberOfMoves", numberOfMoves.text.toString().toInt())
+                intent.putExtra("newGame", true)
                 startActivity(intent)
             } else {
                 showToastMessageForEmptyFields()
             }
         }
+
+        continueGameButton.setOnClickListener {
+            checkIfGameExists()
+        }
     }
 
-    private fun checkValidations(
-        boardSize: EditText,
-        numberOfMoves: EditText
-    ) =
+    private fun checkIfGameExists() {
+        val sh = getSharedPreferences(
+            "ChessBoardPref",
+            Context.MODE_PRIVATE
+        )
+        if (sh.contains("boardSize") && sh.contains("numberOfMoves")) {
+            val intent = Intent(this, ChessBoardActivity::class.java)
+            intent.putExtra("newGame", false)
+            startActivity(intent)
+        } else {
+            showToastMessageNoGameFound()
+        }
+    }
+
+    private fun checkValidations() =
         (!boardSize.text.isNullOrEmpty() || !numberOfMoves.text.isNullOrEmpty())
                 && (boardSize.error.isNullOrEmpty() && numberOfMoves.error.isNullOrEmpty())
 
-    private fun initEditTextValidators(
-        boardSize: EditText,
-        numberOfMoves: EditText
-    ) {
-
+    private fun initEditTextValidators() {
         boardSize.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {}
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (s.toString().toInt() !in 6..16) {
+                if (s.isNullOrEmpty() || s.toString().toInt() !in 6..16) {
                     boardSize.error = getString(R.string.message_valid_board_size)
                 }
             }
@@ -69,7 +86,7 @@ class MainActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (s.toString().toInt() < 3) {
+                if (s.isNullOrEmpty() || s.toString().toInt() < 3) {
                     numberOfMoves.error = getString(R.string.message_valid_number_of_moves)
                 }
             }
@@ -80,6 +97,14 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(
             applicationContext,
             getString(R.string.message_validations),
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun showToastMessageNoGameFound() {
+        Toast.makeText(
+            applicationContext,
+            getString(R.string.message_no_game_found),
             Toast.LENGTH_LONG
         ).show()
     }

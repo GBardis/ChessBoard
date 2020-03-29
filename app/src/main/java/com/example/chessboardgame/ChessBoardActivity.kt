@@ -1,5 +1,6 @@
 package com.example.chessboardgame
 
+import android.content.Context
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -11,21 +12,36 @@ import androidx.core.content.ContextCompat
 import com.example.chessboardgame.ShortestPath.BFS
 import kotlinx.android.synthetic.main.activity_chess_board.*
 
+
 class ChessBoardActivity : AppCompatActivity() {
     private lateinit var boardCells: Array<Array<ImageView?>>
     private var startingPosition = Cell()
     private var endingPosition = Cell()
+    private var boardSize: Int? = null
+    private var numberOfMoves: Int? = null
+    lateinit var resetButton: Button
+    lateinit var calculatePathButton: Button
+    var newGame: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chess_board)
-        val resetButton: Button = findViewById(R.id.button_reset)
-        val calculatePathButton: Button = findViewById(R.id.button_calculate_paths)
+        initView()
+        loadBoard()
+    }
 
-        val boardSize = intent.getStringExtra("boardSize")!!.toInt()
-        val numberOfMoves = intent.getStringExtra("numberOfMoves")!!.toInt()
-        boardCells = Array(boardSize) { arrayOfNulls<ImageView>(boardSize) }
+    private fun initView() {
+        resetButton = findViewById(R.id.button_reset)
+        calculatePathButton = findViewById(R.id.button_calculate_paths)
+        newGame = intent.getBooleanExtra("newGame", false)
 
+        if (newGame) {
+            boardSize = intent.getIntExtra("boardSize", 6)
+            numberOfMoves = intent.getIntExtra("numberOfMoves", 3)
+            boardCells = Array(boardSize!!) { arrayOfNulls<ImageView>(boardSize!!) }
+        } else {
+            continueGame()
+        }
         resetButton.setOnClickListener {
             resetValues()
         }
@@ -37,11 +53,73 @@ class ChessBoardActivity : AppCompatActivity() {
             // destination coordinates
             val dest = Cell(endingPosition.x, endingPosition.y)
 
-            println("Minimum number of steps required is " + BFS(src, dest, boardSize))
+            println("Minimum number of steps required is " + BFS(src, dest, boardSize!!))
         }
-
-        loadBoard()
     }
+
+    override fun onResume() {
+        super.onResume()
+        if (!newGame) {
+            getGamePreferences()
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        saveGamePreferences()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        saveGamePreferences()
+    }
+
+    private fun saveGamePreferences() {
+        newGame = false
+        val sharedPreferences = getSharedPreferences(
+            "ChessBoardPref",
+            Context.MODE_PRIVATE
+        )
+
+        val myEdit = sharedPreferences.edit()
+
+        myEdit.putInt(
+            "boardSize",
+            boardSize!!.toInt()
+        )
+
+        myEdit.putInt(
+            "numberOfMoves",
+            numberOfMoves!!.toInt()
+        )
+
+        myEdit.putBoolean(
+            "newGame",
+            newGame
+        )
+
+        myEdit.apply()
+    }
+
+
+    private fun continueGame() {
+        if (!newGame) {
+            getGamePreferences()
+        }
+    }
+
+
+    private fun getGamePreferences() {
+        val sh = getSharedPreferences(
+            "ChessBoardPref",
+            Context.MODE_PRIVATE
+        )
+        boardSize = sh.getInt("boardSize", 6)
+        numberOfMoves = sh.getInt("numberOfMoves", 3)
+        newGame = sh.getBoolean("newGame", false)
+        boardCells = Array(boardSize!!) { arrayOfNulls<ImageView>(boardSize!!) }
+    }
+
 
     private fun loadBoard() {
         for (i in boardCells.indices) {
