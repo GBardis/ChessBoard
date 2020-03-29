@@ -4,9 +4,16 @@ class Cell(
     var x: Int = 0,
     var y: Int = 0,
     var dist: Int = 0,
-    var assignImage: Boolean = false
+    var assignImage: Boolean = false,
+    var parent: Cell? = null
 ) {
 
+    constructor(x: Int, y: Int, dist: Int, parent: Cell?) : this() {
+        this.x = x
+        this.y = y
+        this.dist = dist
+        this.parent = parent
+    }
 
     override fun equals(o: Any?): Boolean {
         if (this === o) return true
@@ -23,3 +30,4 @@ class Cell(
         return result
     }
 }
+

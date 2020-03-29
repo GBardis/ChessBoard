@@ -9,9 +9,12 @@ import android.widget.ImageView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.example.chessboardgame.ShortestPath.BFS
+import com.example.chessboardgame.ShortestPath.*
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import kotlinx.android.synthetic.main.activity_chess_board.*
-
+import kotlinx.coroutines.*
+import java.lang.reflect.Type
 
 class ChessBoardActivity : AppCompatActivity() {
     private lateinit var boardCells: Array<Array<ImageView?>>
@@ -22,12 +25,18 @@ class ChessBoardActivity : AppCompatActivity() {
     lateinit var resetButton: Button
     lateinit var calculatePathButton: Button
     var newGame: Boolean = false
+    private val gson = Gson()
+    private val job = Job()
+    private val uiScope = CoroutineScope(Dispatchers.Main + job)
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_chess_board)
         initView()
-        loadBoard()
+        if (newGame) {
+            loadBoard()
+        }
     }
 
     private fun initView() {
@@ -39,21 +48,47 @@ class ChessBoardActivity : AppCompatActivity() {
             boardSize = intent.getIntExtra("boardSize", 6)
             numberOfMoves = intent.getIntExtra("numberOfMoves", 3)
             boardCells = Array(boardSize!!) { arrayOfNulls<ImageView>(boardSize!!) }
-        } else {
-            continueGame()
         }
+
         resetButton.setOnClickListener {
             resetValues()
         }
 
         calculatePathButton.setOnClickListener {
-            // source coordinates
-            val src = Cell(startingPosition.x, startingPosition.y)
+            if (startingPosition.assignImage && endingPosition.assignImage) {
+                uiScope.launch {
+                    val thread = async(Dispatchers.IO) {
+                        print(Thread.currentThread().name)
+                        calculatePath()
+                    }
+                    thread.await()
+                    printPath()
+                }
+            } else {
+                showToastMessageForNoChessPoints()
+            }
+        }
+    }
 
-            // destination coordinates
-            val dest = Cell(endingPosition.x, endingPosition.y)
+    private fun calculatePath() {
+        // source coordinates
+        val src = Cell(startingPosition.x, startingPosition.y)
+        // destination coordinates
+        val dest = Cell(endingPosition.x, endingPosition.y)
 
-            println("Minimum number of steps required is " + BFS(src, dest, boardSize!!))
+        val cell: Cell = BFS(src, dest, boardSize!!)
+        println("Minimum number of steps required is " + cell.dist)
+        print("The complete path is: ")
+        createPath(cell)
+    }
+
+    private fun printPath() {
+        for (cellPaths in cellPath) {
+            boardCells[cellPaths.x][cellPaths.y]?.setBackgroundColor(
+                ContextCompat.getColor(this, R.color.colorPath)
+            )
+            layout_board.removeView(boardCells[cellPaths.x][cellPaths.y])
+            layout_board.addView(boardCells[cellPaths.x][cellPaths.y])
         }
     }
 
@@ -75,49 +110,69 @@ class ChessBoardActivity : AppCompatActivity() {
     }
 
     private fun saveGamePreferences() {
-        newGame = false
         val sharedPreferences = getSharedPreferences(
-            "ChessBoardPref",
-            Context.MODE_PRIVATE
+            "ChessBoardPref", Context.MODE_PRIVATE
         )
+        newGame = false
 
-        val myEdit = sharedPreferences.edit()
+        val gEdit = sharedPreferences.edit()
 
-        myEdit.putInt(
-            "boardSize",
-            boardSize!!.toInt()
-        )
+        gEdit.putInt("boardSize", boardSize!!.toInt())
 
-        myEdit.putInt(
-            "numberOfMoves",
-            numberOfMoves!!.toInt()
-        )
+        gEdit.putInt("numberOfMoves", numberOfMoves!!.toInt())
 
-        myEdit.putBoolean(
-            "newGame",
-            newGame
-        )
+        gEdit.putBoolean("newGame", newGame)
 
-        myEdit.apply()
+        gEdit.putString("SolvedPath", gson.toJson(cellPath))
+
+        gEdit.putString("startingPosition", gson.toJson(startingPosition))
+
+        gEdit.putString("endingPosition", gson.toJson(endingPosition))
+
+        gEdit.apply()
     }
-
-
-    private fun continueGame() {
-        if (!newGame) {
-            getGamePreferences()
-        }
-    }
-
 
     private fun getGamePreferences() {
-        val sh = getSharedPreferences(
-            "ChessBoardPref",
-            Context.MODE_PRIVATE
+        val sharedPreferences = getSharedPreferences(
+            "ChessBoardPref", Context.MODE_PRIVATE
         )
-        boardSize = sh.getInt("boardSize", 6)
-        numberOfMoves = sh.getInt("numberOfMoves", 3)
-        newGame = sh.getBoolean("newGame", false)
+        val listType: Type = object : TypeToken<ArrayList<Cell?>?>() {}.type
+
+        boardSize = sharedPreferences.getInt(
+            "boardSize", 0
+        )
+        numberOfMoves = sharedPreferences.getInt(
+            "numberOfMoves", 0
+        )
+        newGame = sharedPreferences.getBoolean(
+            "newGame", false
+        )
+
+        cellPath = gson.fromJson(
+            sharedPreferences.getString(
+                "SolvedPath", ""
+            ), listType
+        )
+        startingPosition = gson.fromJson(
+            sharedPreferences.getString(
+                "startingPosition", ""
+            ), Cell::class.java
+        )
+        endingPosition = gson.fromJson(
+            sharedPreferences.getString(
+                "endingPosition", ""
+            ), Cell::class.java
+        )
+
         boardCells = Array(boardSize!!) { arrayOfNulls<ImageView>(boardSize!!) }
+
+        loadBoard()
+        if (cellPath.isNotEmpty()) {
+            printPath()
+            boardCells[startingPosition.x][startingPosition.y]?.setImageResource(R.drawable.chess_horse)
+            boardCells[endingPosition.x][endingPosition.y]?.setImageResource(R.drawable.chess_waypoint)
+        }
+
     }
 
 
@@ -149,8 +204,8 @@ class ChessBoardActivity : AppCompatActivity() {
     }
 
     inner class CellClickListener(
-        val i: Int,
-        val j: Int
+        private val i: Int,
+        private val j: Int
     ) : View.OnClickListener {
 
         override fun onClick(p0: View?) {
@@ -166,21 +221,28 @@ class ChessBoardActivity : AppCompatActivity() {
                 endingPosition.x = i
                 endingPosition.y = j
             } else {
-                showToastMessage()
+                showToastMessageForChessPoints()
             }
         }
-
     }
 
     private fun hasDrawable(imageView: ImageView): Boolean {
         return imageView.drawable != null
     }
 
-    private fun showToastMessage() {
+    private fun showToastMessageForChessPoints() {
         Toast.makeText(
             applicationContext,
-            getString(R.string.message_both_values_are_assigned),
-            Toast.LENGTH_SHORT
+            getString(R.string.message_both_pointers_are_assigned),
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+    private fun showToastMessageForNoChessPoints() {
+        Toast.makeText(
+            applicationContext,
+            getString(R.string.message_pointers_are_not_assigned),
+            Toast.LENGTH_LONG
         ).show()
     }
 
@@ -193,5 +255,15 @@ class ChessBoardActivity : AppCompatActivity() {
         endingPosition.x = 0
         endingPosition.y = 0
         endingPosition.assignImage = false
+        for (cellPaths in cellPath) {
+            boardCells[cellPaths.x][cellPaths.y]?.setBackgroundColor(
+                ContextCompat.getColor(
+                    this,
+                    R.color.colorPrimary
+                )
+            )
+            layout_board.removeView(boardCells[cellPaths.x][cellPaths.y])
+            layout_board.addView(boardCells[cellPaths.x][cellPaths.y])
+        }
     }
 }

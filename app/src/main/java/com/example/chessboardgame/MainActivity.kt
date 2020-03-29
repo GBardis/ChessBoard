@@ -2,6 +2,7 @@ package com.example.chessboardgame
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -9,6 +10,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.example.chessboardgame.ShortestPath.cellPath
 
 class MainActivity : AppCompatActivity() {
     lateinit var boardSize: EditText
@@ -34,6 +36,7 @@ class MainActivity : AppCompatActivity() {
 
         startGameButton.setOnClickListener {
             if (checkValidations()) {
+                clearPreferences()
                 val intent = Intent(this, ChessBoardActivity::class.java)
                 intent.putExtra("boardSize", boardSize.text.toString().toInt())
                 intent.putExtra("numberOfMoves", numberOfMoves.text.toString().toInt())
@@ -50,17 +53,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkIfGameExists() {
-        val sh = getSharedPreferences(
+        val sharedPreferences = getSharedPreferences(
             "ChessBoardPref",
             Context.MODE_PRIVATE
         )
-        if (sh.contains("boardSize") && sh.contains("numberOfMoves")) {
+        if (sharedPreferences.contains("boardSize") && sharedPreferences.contains("numberOfMoves")) {
             val intent = Intent(this, ChessBoardActivity::class.java)
             intent.putExtra("newGame", false)
             startActivity(intent)
         } else {
             showToastMessageNoGameFound()
         }
+    }
+
+    private fun clearPreferences(){
+        val settings: SharedPreferences =
+            getSharedPreferences("ChessBoardPref", Context.MODE_PRIVATE)
+        settings.edit().clear().apply()
+        cellPath.clear()
     }
 
     private fun checkValidations() =
