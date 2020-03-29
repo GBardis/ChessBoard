@@ -4,6 +4,10 @@
     <string name="reset">Reset</string>
     <string name="calculate_paths">calculate paths</string>
     <string name="start_game">Start Game</string>
-    <string name="add_number_of_moves_moves">Add number of moves</string>
-    <string name="board_size">Board Size</string>
+    <string name="add_number_of_moves_moves">Add number of moves (default 3)</string>
+    <string name="board_size">Board Size(minimum=6 maximum=16)</string>
+    <string name="message_validations">You must provide a board size and number of moves with correct values</string>
+    <string name="message_valid_board_size">The size of the chessBoard must between 6 and 16</string>
+    <string name="message_valid_number_of_moves">number of moves can not be less than 3</string>
+    <string name="title_instructions">Create a board and give the maximum moves to find the paths to the target point</string>
 </resources>
