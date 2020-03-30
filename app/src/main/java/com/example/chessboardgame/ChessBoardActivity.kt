@@ -3,10 +3,7 @@ package com.example.chessboardgame
 import android.content.Context
 import android.os.Bundle
 import android.view.View
-import android.widget.Button
-import android.widget.GridLayout
-import android.widget.ImageView
-import android.widget.Toast
+import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.example.chessboardgame.ShortestPath.*
@@ -24,6 +21,7 @@ class ChessBoardActivity : AppCompatActivity() {
     private var numberOfMoves: Int? = null
     lateinit var resetButton: Button
     lateinit var calculatePathButton: Button
+    lateinit var resultTextView: TextView
     var newGame: Boolean = false
     private val gson = Gson()
     private val job = Job()
@@ -42,6 +40,7 @@ class ChessBoardActivity : AppCompatActivity() {
     private fun initView() {
         resetButton = findViewById(R.id.button_reset)
         calculatePathButton = findViewById(R.id.button_calculate_paths)
+        resultTextView = findViewById(R.id.text_view_result)
         newGame = intent.getBooleanExtra("newGame", false)
 
         if (newGame) {
@@ -58,11 +57,16 @@ class ChessBoardActivity : AppCompatActivity() {
             if (startingPosition.assignImage && endingPosition.assignImage) {
                 uiScope.launch {
                     val thread = async(Dispatchers.IO) {
-                        print(Thread.currentThread().name)
-                        calculatePath()
+                        return@async calculatePath()
                     }
-                    thread.await()
-                    printPath()
+                    val results = thread.await()
+                    if (results.dist > numberOfMoves!!) {
+                        showToastMessageForNumberOfMoves()
+                    } else {
+                        createPath(results)
+                        printPath()
+                        printResults()
+                    }
                 }
             } else {
                 showToastMessageForNoChessPoints()
@@ -70,25 +74,41 @@ class ChessBoardActivity : AppCompatActivity() {
         }
     }
 
-    private fun calculatePath() {
+    private fun removeStartingPoint(): List<Cell> {
+        val (match, _) = cellPath.partition {
+            (it.x != startingPosition.x && it.y != startingPosition.y)
+        }
+        return match
+    }
+
+    private fun printResults() {
+        val cellPoints = removeStartingPoint()
+        val builder = StringBuilder()
+        for (path in cellPoints) {
+            builder.append("(${path.x}, ${path.y})").append("  ")
+        }
+        resultTextView.text = builder.toString()
+    }
+
+    private fun calculatePath(): Cell {
+        cellPath.clear()
         // source coordinates
         val src = Cell(startingPosition.x, startingPosition.y)
         // destination coordinates
         val dest = Cell(endingPosition.x, endingPosition.y)
 
-        val cell: Cell = BFS(src, dest, boardSize!!)
-        println("Minimum number of steps required is " + cell.dist)
-        print("The complete path is: ")
-        createPath(cell)
+        return BFS(src, dest, boardSize!!)
     }
 
     private fun printPath() {
-        for (cellPaths in cellPath) {
-            boardCells[cellPaths.x][cellPaths.y]?.setBackgroundColor(
+        val cellPoints = removeStartingPoint()
+        for (path in cellPoints) {
+            boardCells[path.x][path.y]?.setBackgroundColor(
                 ContextCompat.getColor(this, R.color.colorPath)
+
             )
-            layout_board.removeView(boardCells[cellPaths.x][cellPaths.y])
-            layout_board.addView(boardCells[cellPaths.x][cellPaths.y])
+            layout_board.removeView(boardCells[path.x][path.y])
+            layout_board.addView(boardCells[path.x][path.y])
         }
     }
 
@@ -104,30 +124,35 @@ class ChessBoardActivity : AppCompatActivity() {
         saveGamePreferences()
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        saveGamePreferences()
-    }
-
     private fun saveGamePreferences() {
         val sharedPreferences = getSharedPreferences(
             "ChessBoardPref", Context.MODE_PRIVATE
         )
         newGame = false
-
         val gEdit = sharedPreferences.edit()
 
         gEdit.putInt("boardSize", boardSize!!.toInt())
 
         gEdit.putInt("numberOfMoves", numberOfMoves!!.toInt())
 
-        gEdit.putBoolean("newGame", newGame)
+        gEdit.putBoolean("newGame", false)
 
         gEdit.putString("SolvedPath", gson.toJson(cellPath))
 
-        gEdit.putString("startingPosition", gson.toJson(startingPosition))
+        cellPath.clear()
 
-        gEdit.putString("endingPosition", gson.toJson(endingPosition))
+        if (startingPosition.assignImage && endingPosition.assignImage) {
+            gEdit.putString("startingPosition", gson.toJson(startingPosition))
+
+            gEdit.putString("endingPosition", gson.toJson(endingPosition))
+        } else {
+            boardCells[startingPosition.x][startingPosition.y]?.setImageResource(0)
+            boardCells[endingPosition.x][endingPosition.y]?.setImageResource(0)
+            startingPosition.assignImage = false
+            endingPosition.assignImage = false
+            gEdit.putString("startingPosition", gson.toJson(startingPosition))
+            gEdit.putString("endingPosition", gson.toJson(endingPosition))
+        }
 
         gEdit.apply()
     }
@@ -158,6 +183,7 @@ class ChessBoardActivity : AppCompatActivity() {
                 "startingPosition", ""
             ), Cell::class.java
         )
+
         endingPosition = gson.fromJson(
             sharedPreferences.getString(
                 "endingPosition", ""
@@ -169,10 +195,17 @@ class ChessBoardActivity : AppCompatActivity() {
         loadBoard()
         if (cellPath.isNotEmpty()) {
             printPath()
-            boardCells[startingPosition.x][startingPosition.y]?.setImageResource(R.drawable.chess_horse)
-            boardCells[endingPosition.x][endingPosition.y]?.setImageResource(R.drawable.chess_waypoint)
+            printResults()
         }
 
+        if ((startingPosition.x != 0 && startingPosition.y != 0)
+            && (endingPosition.x != 0 && endingPosition.y != 0)
+        ) {
+            boardCells[startingPosition.x][startingPosition.y]
+                ?.setImageResource(R.drawable.chess_horse)
+            boardCells[endingPosition.x][endingPosition.y]
+                ?.setImageResource(R.drawable.chess_waypoint)
+        }
     }
 
 
@@ -226,9 +259,8 @@ class ChessBoardActivity : AppCompatActivity() {
         }
     }
 
-    private fun hasDrawable(imageView: ImageView): Boolean {
-        return imageView.drawable != null
-    }
+    private fun hasDrawable(imageView: ImageView) =
+        imageView.drawable != null
 
     private fun showToastMessageForChessPoints() {
         Toast.makeText(
@@ -242,6 +274,15 @@ class ChessBoardActivity : AppCompatActivity() {
         Toast.makeText(
             applicationContext,
             getString(R.string.message_pointers_are_not_assigned),
+            Toast.LENGTH_LONG
+        ).show()
+    }
+
+
+    private fun showToastMessageForNumberOfMoves() {
+        Toast.makeText(
+            applicationContext,
+            getString(R.string.message_more_moves_to_calculate),
             Toast.LENGTH_LONG
         ).show()
     }
@@ -265,5 +306,7 @@ class ChessBoardActivity : AppCompatActivity() {
             layout_board.removeView(boardCells[cellPaths.x][cellPaths.y])
             layout_board.addView(boardCells[cellPaths.x][cellPaths.y])
         }
+        resultTextView.text = ""
+        cellPath.clear()
     }
 }

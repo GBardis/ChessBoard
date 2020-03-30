@@ -13,4 +13,5 @@
     <string name="title_instructions">Create a board and give the maximum moves to find the paths to the target point</string>
     <string name="button_continue_game">Continue Game</string>
     <string name="message_no_game_found">Cannot find previous game</string>
+    <string name="message_more_moves_to_calculate">We need more moves to find the correct distance</string>
 </resources>

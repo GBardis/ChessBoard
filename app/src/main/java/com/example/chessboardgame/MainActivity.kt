@@ -30,17 +30,15 @@ class MainActivity : AppCompatActivity() {
         startGameButton = findViewById(R.id.button_start_game)
         continueGameButton = findViewById(R.id.button_continue_game)
 
-
-
         initEditTextValidators()
 
         startGameButton.setOnClickListener {
             if (checkValidations()) {
-                clearPreferences()
                 val intent = Intent(this, ChessBoardActivity::class.java)
                 intent.putExtra("boardSize", boardSize.text.toString().toInt())
                 intent.putExtra("numberOfMoves", numberOfMoves.text.toString().toInt())
                 intent.putExtra("newGame", true)
+                clearPreferences()
                 startActivity(intent)
             } else {
                 showToastMessageForEmptyFields()
@@ -57,7 +55,8 @@ class MainActivity : AppCompatActivity() {
             "ChessBoardPref",
             Context.MODE_PRIVATE
         )
-        if (sharedPreferences.contains("boardSize") && sharedPreferences.contains("numberOfMoves")) {
+
+        if (!sharedPreferences.getBoolean("newGame", true)) {
             val intent = Intent(this, ChessBoardActivity::class.java)
             intent.putExtra("newGame", false)
             startActivity(intent)
